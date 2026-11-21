@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Work Assistant</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6a65; --line: #e4e2dc;
+    --accent: #2f5d50; --accent-soft: #e6efeb; --warn: #9a4b16; --warn-soft: #fbefe5;
+    --lock: #7a2e2e; --lock-soft: #f7e7e7; --chip: #f0eee8;
+    --radius: 10px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+  .pill.on { background: var(--accent-soft); color: var(--accent); }
+  .grow { flex: 1; }
+  main { display: grid; grid-template-columns: 260px 1fr 340px; gap: 20px; padding: 20px 24px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  select, input[type=text], input[type=date] { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: #fff; color: var(--ink); }
+  button { font: inherit; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .who { margin-top: 12px; padding: 10px; border-radius: 8px; background: var(--accent-soft); font-size: 14px; }
+  .who b { display: block; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px -4px 14px; }
+  .tab { background: none; color: var(--muted); border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 12px; }
+  .tab.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  .view { display: none; } .view.active { display: block; }
+  .chat { display: flex; flex-direction: column; gap: 10px; min-height: 320px; max-height: 58vh; overflow-y: auto; padding: 4px; }
+  .msg { max-width: 85%; padding: 10px 12px; border-radius: 10px; white-space: pre-wrap; }
+  .msg.q { align-self: flex-end; background: var(--accent); color: #fff; }
+  .msg.a { align-self: flex-start; background: var(--chip); }
+  .msg.refused { background: var(--lock-soft); color: var(--lock); }
+  .msg.clarify { background: var(--warn-soft); color: var(--warn); }
+  .msg .meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .src { font: 12px var(--mono); padding: 2px 8px; border-radius: 6px; background: #fff; border: 1px solid var(--line); color: var(--ink); cursor: pointer; }
+  .src:hover { border-color: var(--accent); }
+  .opt { font-size: 13px; padding: 4px 10px; background: #fff; color: var(--warn); border-color: var(--warn); }
+  .usage { font-size: 11px; color: var(--muted); }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .row input { flex: 1; }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ex { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: #fff; color: var(--muted); border: 1px solid var(--line); }
+  .ex:hover { color: var(--accent); border-color: var(--accent); }
+  .dates { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .brief { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  .brief h3 { margin: 0 0 4px; font-size: 15px; }
+  .brief h4 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .brief ul { margin: 0; padding-left: 18px; } .brief li { margin: 4px 0; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; }
+  .badge.quiet { background: var(--chip); color: var(--muted); }
+  .result { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--chip); }
+  .result.ok { background: var(--accent-soft); color: var(--accent); }
+  .result.no { background: var(--lock-soft); color: var(--lock); }
+  dl { margin: 0; } dt { font-size: 12px; color: var(--muted); margin-top: 10px; } dd { margin: 2px 0 0; }
+  .record-body { white-space: pre-wrap; font-size: 14px; background: var(--bg); border-radius: 8px; padding: 10px; margin-top: 8px; max-height: 50vh; overflow-y: auto; }
+  .locked { color: var(--lock); background: var(--lock-soft); padding: 10px; border-radius: 8px; }
+  .empty { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Work Assistant</h1>
+    <div class="sub">Briefs and answers from the team's records. Every line has a source. Nobody sees what isn't theirs.</div>
+  </div>
+  <div class="grow"></div>
+  <span class="pill" id="pill-data">No data loaded</span>
+  <span class="pill on" id="pill-vdb">Vector DB: active</span>
+  <span class="pill" id="pill-ai">AI fallback: off</span>
+</header>
+
+<main>
+  <!-- left: who and when -->
+  <aside>
+    <div class="card">
+      <h2>You are</h2>
+      <select id="person"></select>
+      <div class="who" id="who"></div>
+      <label for="asof">Time ("now" for questions)</label>
+      <select id="asof"></select>
+      <div class="note">Switch person to see privacy at work: the same question can get a different answer.</div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>Data</h2>
+      <div class="empty" id="data-info">Loading…</div>
+      <div class="row"><button class="ghost" id="load-btn">Load all days</button></div>
+      <div class="note">Starts fresh from day 1 (also clears updates made here).</div>
+    </div>
+  </aside>
+
+  <!-- middle: the work -->
+  <section class="card">
+    <div class="tabs">
+      <button class="tab active" data-view="ask">Ask</button>
+      <button class="tab" data-view="briefs">Meeting briefs</button>
+      <button class="tab" data-view="update">Update</button>
+      <button class="tab" data-view="memory">What I remember</button>
+    </div>
+
+    <div class="view active" id="view-ask">
+      <div class="chat" id="chat"></div>
+      <form class="row" id="ask-form" autocomplete="off">
+        <input type="text" id="ask-input" maxlength="500" placeholder="Ask anything, e.g. Who owns billing for NB?">
+        <button type="submit">Ask</button>
+      </form>
+      <div class="examples" id="ask-examples"></div>
+    </div>
+
+    <div class="view" id="view-briefs">
+      <div class="dates" id="meeting-dates"></div>
+      <div id="briefs"><div class="empty">Pick a date to see the brief for each of your meetings.</div></div>
+    </div>
+
+    <div class="view" id="view-update">
+      <p class="empty" style="margin-top:0">Change something in plain English. You can update <b>your own</b> tasks,
+        set preferences for <b>your own</b> briefs, correct a fact, or ask me to forget something. Every change is saved under your name.</p>
+      <form class="row" id="update-form" autocomplete="off">
+        <input type="text" id="update-input" maxlength="300" placeholder="e.g. Mark the send invoice task as done">
+        <button type="submit">Save</button>
+      </form>
+      <div class="examples" id="update-examples"></div>
+      <div id="update-result"></div>
+    </div>
+
+    <div class="view" id="view-memory"><div id="memory"></div></div>
+  </section>
+
+  <!-- right: the source -->
+  <aside class="card">
+    <h2>Source</h2>
+    <div id="source"><div class="empty">Click any record id (like <span class="src">rgg1ex2g</span>) to read the record it came from.
+      You can only open records you are allowed to see.</div></div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+// All text from the server is put on the page with textContent, never as HTML,
+// so a record that contains code or tags can never run in the browser.
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+let PEOPLE = [], STATUS = {};
+
+async function api(name, body) {
+  const r = await fetch("/api/" + name, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  return r.json();
+}
+const me = () => $("person").value;
+const at = () => $("asof").value || null;
+
+function srcChip(id) {
+  const b = el("button", "src", id); b.type = "button";
+  b.onclick = () => showRecord(id);
+  return b;
+}
+function usageLine(u) {
+  if (!u) return null;
+  const t = u.input_tokens ? `${u.input_tokens} in / ${u.output_tokens} out tokens · $${u.cost_usd}` : "rules only · 0 tokens";
+  return el("span", "usage", `${t} · ${u.ms} ms`);
+}
+
+// ---------- setup ----------
+async function init() {
+  PEOPLE = (await api("people")).people;
+  const groups = {};
+  for (const p of PEOPLE) (groups[p.org] = groups[p.org] || []).push(p);
+  for (const org of Object.keys(groups)) {
+    const g = el("optgroup"); g.label = org === "org_kp" ? "Kitepoint Studio" : org === "org_bw" ? "Brightwave Media" : org;
+    for (const p of groups[org]) { const o = el("option", null, `${p.name} (${p.id})`); o.value = p.id; g.appendChild(o); }
+    $("person").appendChild(g);
+  }
+  $("person").value = "p02";
+  await refreshStatus();
+  onPerson();
+}
+async function refreshStatus() {
+  STATUS = await api("status");
+  $("pill-data").textContent = STATUS.days.length ? `Days loaded: ${STATUS.days.join(", ")}` : "No data loaded";
+  $("pill-data").className = "pill" + (STATUS.days.length ? " on" : "");
+  if (STATUS.vector_db) {
+    $("pill-vdb").textContent = `Vector DB: ${STATUS.vector_db}`;
+    $("pill-vdb").className = "pill on";
+  }
+  $("pill-ai").textContent = STATUS.ai ? `AI fallback: ${STATUS.ai}` : "AI fallback: off (rules only)";
+  $("pill-ai").className = "pill" + (STATUS.ai ? " on" : "");
+  $("data-info").textContent = STATUS.days.length
+    ? `${STATUS.records} records from ${STATUS.days.length} day(s).`
+    : `No data yet. Days available: ${STATUS.available.join(", ") || "none"}.`;
+  const sel = $("asof"); const keep = sel.value; sel.textContent = "";
+  for (const d of STATUS.days) {
+    const date = STATUS.dates[d];
+    const dt = new Date(date + "T12:00:00");
+    const o = el("option", null, `Day ${d} · ${dt.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, evening`);
+    o.value = `${date}T18:00:00Z`; sel.appendChild(o);
+  }
+  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+  else if (sel.options.length) sel.selectedIndex = sel.options.length - 1;
+}
+$("load-btn").onclick = async () => {
+  $("load-btn").disabled = true; $("data-info").textContent = "Loading…";
+  try {
+    await api("load", { upto: 15 });
+  } catch (e) {
+    console.error("Load failed:", e);
+  } finally {
+    await refreshStatus(); onPerson();
+    $("load-btn").disabled = false;
+  }
+};
+
+function onPerson() {
+  const p = PEOPLE.find(x => x.id === me());
+  const who = $("who"); who.textContent = "";
+  who.appendChild(el("b", null, p ? p.name : ""));
+  who.appendChild(document.createTextNode(p ? `${p.role} · ${p.org === "org_kp" ? "Kitepoint Studio" : "Brightwave Media"}` : ""));
+  $("chat").textContent = "";
+  addMsg("a", `Hi ${p ? p.name.split(" ")[0] : ""}. I only use records you are allowed to see. Ask me something.`);
+  loadMeetings(); $("briefs").textContent = ""; $("briefs").appendChild(el("div", "empty", "Pick a date to see the brief for each of your meetings."));
+  $("update-result").textContent = ""; loadMemory();
+  $("source").textContent = ""; $("source").appendChild(el("div", "empty", "Click any record id to read the record it came from."));
+}
+$("person").onchange = onPerson;
+$("asof").onchange = () => { loadMemory(); };
+
+// ---------- tabs ----------
+for (const t of document.querySelectorAll(".tab")) {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+    document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + t.dataset.view));
+    if (t.dataset.view === "memory") loadMemory();
+  };
+}
+
+// ---------- ask ----------
+function addMsg(kind, text, extra) {
+  const m = el("div", "msg " + kind, text);
+  if (extra) m.appendChild(extra);
+  $("chat").appendChild(m); $("chat").scrollTop = $("chat").scrollHeight;
+  return m;
+}
+async function ask(q) {
+  if (!q.trim()) return;
+  addMsg("q", q);
+  const r = await api("ask", { person: me(), at: at(), q });
+  if (r.error) return addMsg("a", r.error);
+  const meta = el("div", "meta");
+  if (r.refused) {
+    addMsg("a refused", "🔒 I can't share that. It's in a record you are not allowed to see.", meta);
+  } else if (r.clarify) {
+    for (const o of r.clarify.options || []) {
+      const b = el("button", "opt", o.text || o.id); b.type = "button";
+      b.onclick = () => ask(`${q.replace(/\?$/, "")} (${o.text})?`);
+      meta.appendChild(b);
+    }
+    addMsg("a clarify", r.clarify.question, meta);
+  } else if (r.answer) {
+    for (const s of r.answer.sources || []) meta.appendChild(srcChip(s));
+    addMsg("a", r.answer.text, meta);
+  } else {
+    addMsg("a", "I have nothing on that.", meta);
+  }
+  const u = usageLine(r.usage); if (u) meta.appendChild(u);
+}
+$("ask-form").onsubmit = (e) => { e.preventDefault(); const q = $("ask-input").value; $("ask-input").value = ""; ask(q); };
+for (const q of ["Who owns billing for NB?", "Is the Friday thing done?", "When is the launch?", "What did I say about Rohan?",
+                 "What did Meera say about me?", "Send the NB deck to Arjun", "What is blocked?", "Who is on leave next week?",
+                 "What is the Northbeam revenue for October?", "What are my tasks?"]) {
+  const b = el("button", "ex", q); b.type = "button"; b.onclick = () => ask(q); $("ask-examples").appendChild(b);
+}
+
+// ---------- briefs ----------
+async function loadMeetings() {
+  const box = $("meeting-dates"); box.textContent = "";
+  const r = await api("meetings", { person: me() });
+  if (r.error || !r.meetings.length) { box.appendChild(el("span", "empty", "No meetings for this person.")); return; }
+  const byDate = {};
+  for (const m of r.meetings) (byDate[m.date] = byDate[m.date] || []).push(m.title);
+  for (const d of Object.keys(byDate)) {
+    const b = el("button", "ex", `${d} · ${byDate[d].join(", ")}`); b.type = "button";
+    b.onclick = () => loadBrief(d); box.appendChild(b);
+  }
+}
+function list(items, render) { const ul = el("ul"); for (const i of items) { const li = el("li"); render(li, i); ul.appendChild(li); } return ul; }
+async function loadBrief(day) {
+  const box = $("briefs"); box.textContent = ""; box.appendChild(el("div", "empty", "Preparing…"));
+  const r = await api("brief", { person: me(), date: day, at: at() });
+  box.textContent = "";
+  if (r.error) return box.appendChild(el("div", "empty", r.error));
+  if (!r.briefs.length) return box.appendChild(el("div", "empty", `No meetings on ${day}.`));
+  for (const b of r.briefs) {
+    const c = el("div", "brief");
+    const h = el("h3", null, b.meeting_id);
+    h.appendChild(el("span", "badge" + (b.status === "nothing_new" ? " quiet" : ""), b.status === "nothing_new" ? "nothing new" : "brief"));
+    c.appendChild(h);
+    if (b.status === "nothing_new") { c.appendChild(el("div", "empty", "Nothing changed since your last meeting with this client.")); box.appendChild(c); continue; }
+    c.appendChild(el("h4", null, "What changed"));
+    c.appendChild(list(b.changed, (li, x) => { li.appendChild(document.createTextNode(x.text + " ")); x.sources.forEach(s => li.appendChild(srcChip(s))); }));
+    if (b.promises.length) {
+      c.appendChild(el("h4", null, "Open promises"));
+      c.appendChild(list(b.promises, (li, p) => {
+        const n = (PEOPLE.find(x => x.id === p.owner) || {}).name || p.owner;
+        li.appendChild(document.createTextNode(`${n}: ${p.what}, due ${p.due} `)); p.sources.forEach(s => li.appendChild(srcChip(s)));
+      }));
+    }
+    if (b.open_these.length) {
+      c.appendChild(el("h4", null, "Open these first"));
+      c.appendChild(list(b.open_these, (li, o) => { li.appendChild(srcChip(o.record)); li.appendChild(document.createTextNode(" " + o.why)); }));
+    }
+    if (b.question_to_ask) {
+      c.appendChild(el("h4", null, "Question to ask"));
+      const p = el("div", null, b.question_to_ask.text + " "); (b.question_to_ask.sources || []).forEach(s => p.appendChild(srcChip(s)));
+      c.appendChild(p);
+    }
+    const u = usageLine(b.usage); if (u) { u.style.display = "block"; u.style.marginTop = "10px"; c.appendChild(u); }
+    box.appendChild(c);
+  }
+}
+
+// ---------- update ----------
+async function doUpdate(text) {
+  if (!text.trim()) return;
+  const r = await api("update", { person: me(), text, at: at() });
+  const box = $("update-result"); box.textContent = "";
+  const d = el("div", "result " + (r.ok ? "ok" : "no"), (r.ok ? "✓ " : "✗ ") + (r.message || r.error));
+  if (r.record) { d.appendChild(document.createTextNode(" ")); d.appendChild(srcChip(r.record)); }
+  box.appendChild(d); loadMemory();
+}
+$("update-form").onsubmit = (e) => { e.preventDefault(); doUpdate($("update-input").value); $("update-input").value = ""; };
+for (const t of ["Mark the send invoice task as done", "Move the review campaign copy task to 12 Nov", "Max 5 changes for me",
+                 "Put blockers first", "No, Arjun owns billing now", "Forget what I said about the Dubai trip",
+                 "Mark the homepage redesign as done"]) {
+  const b = el("button", "ex", t); b.type = "button"; b.onclick = () => { $("update-input").value = t; }; $("update-examples").appendChild(b);
+}
+
+// ---------- memory (audit) ----------
+async function loadMemory() {
+  const box = $("memory"); box.textContent = "";
+  const r = await api("audit", { person: me(), at: at() });
+  if (r.error) return box.appendChild(el("div", "empty", r.error));
+  box.appendChild(el("p", "empty", "Everything I keep about you, and why. Only things you are allowed to see are shown."));
+  const dl = el("dl");
+  const add = (title, items, fmt) => {
+    dl.appendChild(el("dt", null, title));
+    const dd = el("dd");
+    if (!items || !items.length) dd.appendChild(el("span", "empty", "Nothing."));
+    else dd.appendChild(list(items, fmt));
+    dl.appendChild(dd);
+  };
+  add("Your preferences", r.preferences, (li, p) => li.textContent = p.words);
+  add("Corrections you gave", r.corrections_you_gave, (li, c) => li.textContent = c);
+  add("Things you asked me to forget", r.forget_requests, (li, f) => li.textContent = f);
+  add("Tasks you own", r.tasks_you_own, (li, t) => { li.textContent = `${t.title} · ${t.status} · due ${t.due} `; t.sources.forEach(s => li.appendChild(srcChip(s))); });
+  add("Your promises", r.your_promises, (li, p) => { li.textContent = `${p.what} · due ${p.due} · ${p.open ? "open" : "delivered"} `; p.sources.forEach(s => li.appendChild(srcChip(s))); });
+  add("Your private notes I can use (only for you)", r.your_private_notes_kept, (li, id) => li.appendChild(srcChip(id)));
+  box.appendChild(dl);
+}
+
+// ---------- source viewer ----------
+async function showRecord(id) {
+  const box = $("source"); box.textContent = "";
+  const r = await api("record", { person: me(), id });
+  if (r.error) { box.appendChild(el("div", "locked", "🔒 " + r.error)); return; }
+  const dl = el("dl");
+  const row = (k, v) => { if (v) { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); } };
+  row("Record", r.id); row("Type", r.type); row("When (UTC)", r.at); row("Written by", r.author);
+  row("Client", r.client); row("Who can see it", r.visibility); row("Title", r.title);
+  if (r.change && r.change.field) row("Change", `${r.change.field}: ${r.change.from || ""} → ${r.change.to || ""}`);
+  box.appendChild(dl);
+  box.appendChild(el("div", "record-body", r.body + (r.cells ? "\n\n" + JSON.stringify(r.cells, null, 1) : "")));
+}
+
+init();
+</script>
+</body>
+</html>

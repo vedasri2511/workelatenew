@@ -1,0 +1,7 @@
+# memory and run outputs (made on your machine, never shared)
+assist.db
+store.json
+runs/
+# secrets: API keys live only here
+.env
+__pycache__/
