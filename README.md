@@ -41,6 +41,29 @@ cd BuildSprint-R3-candidate
 - **What I remember:** your preferences, corrections, forgets, tasks, promises and private notes (the bonus `audit`).
 - **Source panel:** click any record id to read it. Records you may not see show 🔒, with no hint of what is in them.
 
+### Architecture & Tech Stack
+
+```
+User (Web UI / CLI)
+  │
+  ▼
+API Router (assist.py)
+  ├── 1. Privacy Pre-Filter (visible_records) ── Time boundary, can_see(), is_forgotten()
+  ├── 2. Intent Classification ────────────── Actions (forget, update) vs. Questions vs. Briefs
+  ├── 3. Hybrid Search Engine ──────────────── Embedded VectorDB (BM25 + Cosine VSM) + Rules
+  └── 4. AI Guard & Fallback ──────────────── Gemini Flash (10s timeout, anti-hallucination check)
+```
+
+| Layer | Component | Details |
+|---|---|---|
+| **Language & Runtime** | Python 3.9+ | Standard library only (`sqlite3`, `http.server`, `urllib`, `json`, `math`, `collections`). **0 pip packages**. |
+| **Database** | SQLite 3 (`assist.db`) | ACID-compliant, parameterized SQL queries (`?`), local file permissions `0o600`. |
+| **Vector Search** | Custom BM25 + Cosine VSM | Inverted term index + TF-IDF cosine ranking with sub-millisecond retrieval. |
+| **AI Fallback** | Google Gemini API | `gemini-3-flash-preview` via REST, 10s timeout circuit-breaker, 60s cooldown on HTTP 429. |
+| **Frontend** | Vanilla JS / CSS3 / HTML5 | Lightweight Single-Page App in `ui.html`, zero external JS/CSS dependencies. |
+| **Security** | Multi-layer Sandbox & Guard | Strict CSP, Host/Origin validation, DNS-rebinding protection, zero data leakage pre-filtering. |
+
+
 ## 3. All commands
 
 | Command | What it does |

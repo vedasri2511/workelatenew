@@ -42,4 +42,36 @@ Cached in SQLite; prompts ≤ ~2,600 tokens (limits 8,000 / 4,000); real usage r
 - Hardcode answers, ids or nicknames, or read the `answers/` folder.
 - Send private data or API keys anywhere except the chosen AI provider's API (keys only in a header, never logged or committed).
 
-*Interface: `serve` runs a local web page (127.0.0.1 only, Host/Origin checks, strict CSP, all text inserted as plain text) with Ask, Meeting briefs, Update, What I remember, and a source viewer that respects privacy.*
+## 6. Architecture & Execution Flow
+```
+User (Web UI / CLI)
+  │
+  ▼
+API Router (assist.py)
+  │
+  ├── 1. Privacy Pre-Filter (visible_records)
+  │      ├── Time fence: upto timestamp
+  │      ├── Role/audience: can_see() check
+  │      └── Memory privacy: is_forgotten() removes forgotten items
+  │
+  ├── 2. Intent Classification
+  │      ├── Action commands (forget, mark done, reassign, postpone) -> apply_update()
+  │      ├── Daily briefs -> cmd_brief()
+  │      └── Questions -> Search Engine
+  │
+  ├── 3. Hybrid Search Engine
+  │      ├── Embedded VectorDB (BM25 + Cosine VSM over visible records)
+  │      └── Deterministic pattern matching (tasks, owners, dates, numbers)
+  │
+  └── 4. Resilience & Fallback
+         ├── Answer found -> emit with source chips [r-xxxx] (0 tokens, $0.00)
+         └── Complex language -> Gemini API (gemini-3-flash-preview, 10s timeout, anti-hallucination verification)
+```
+
+## 7. Complete Tech Stack
+- **Runtime**: Python 3.9+ (100% Standard Library: `sqlite3`, `http.server`, `urllib`, `json`, `math`, `collections`).
+- **Database**: Embedded SQLite 3 (`assist.db`) with parameterized queries (`?`).
+- **Vector Retrieval**: Pure-Python sparse Vector Space Model with BM25 term weighting, IDF saturation, and cosine ranking.
+- **AI Integration**: Google Gemini API REST client via raw `urllib.request` (`gemini-3-flash-preview`), protected by 10s timeout circuit-breaker and 429 rate limit cooldown.
+- **Frontend**: Single-Page Application (`ui.html`) in Vanilla JS (ES6+), semantic HTML5, and responsive CSS3. Zero frontend frameworks, zero CDN dependencies.
+- **Security**: Localhost-only HTTP server (`127.0.0.1`), DNS-rebinding protection (`Host`/`Origin` checks), strict Content Security Policy (`CSP`), anti-framing (`DENY`), and POSIX `0o600` file permissions.
