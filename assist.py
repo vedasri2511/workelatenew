@@ -882,16 +882,24 @@ def call_llm(system, user, max_tokens=300):
     con.close()
     return text
 
+LLM_COOLDOWN_UNTIL = 0
+
 def llm_json(system, user, max_tokens=600):
     """Ask the model for JSON. Any failure (no key, network, bad JSON) returns None: the rules then decide."""
-    if not llm_provider():
+    global LLM_COOLDOWN_UNTIL
+    if not llm_provider() or time.time() < LLM_COOLDOWN_UNTIL:
         return None
     try:
         text = call_llm(system, user, max_tokens)
         text = re.sub(r"^```(?:json)?|```$", "", text.strip()).strip()
         return json.loads(text)
     except Exception as e:
-        print(f"model step skipped: {llm_error(e)}", file=sys.stderr)
+        import urllib.error
+        if isinstance(e, urllib.error.HTTPError) and e.code == 429:
+            LLM_COOLDOWN_UNTIL = time.time() + 60
+            print("model step skipped: HTTP 429 (rate limit / quota reached) - cooling down for 60s, using local rules + Vector DB.", file=sys.stderr)
+        else:
+            print(f"model step skipped: {llm_error(e)}", file=sys.stderr)
         return None
 
 def llm_error(e):
