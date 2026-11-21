@@ -2257,6 +2257,18 @@ def api(name, data):
         q = str(data.get("q") or "").strip()[:500]
         if not q:
             return {"error": "Empty question."}
+        # If the user typed an update, task command, or forget in chat:
+        is_cmd = not q.endswith("?") and re.match(r"(?i)^(please\s+)?(forget|mark|set|move|reassign|assign|give|hand|no\b|actually\b|"
+                                                  r"wrong\b|max\s+\d+|skip\b|hide\b|change\b|update\b|push\b|postpone\b|shift\b)", q)
+        if is_cmd:
+            u_res = apply_update(person, q, at)
+            if u_res.get("ok"):
+                srcs = [u_res["record"]] if u_res.get("record") else []
+                return {"answer": {"text": u_res["message"], "sources": srcs},
+                        "matched": [], "clarify": None, "refused": None, "usage": usage()}
+            elif u_res.get("message") and not any(w in q.lower() for w in ("what", "who", "when", "why", "how")):
+                return {"answer": {"text": u_res["message"], "sources": []},
+                        "matched": [], "clarify": None, "refused": None, "usage": usage()}
         return capture(cmd_ask, person, at or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), q)
     if name == "brief":
         day = str(data.get("date") or "")
